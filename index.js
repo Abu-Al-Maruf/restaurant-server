@@ -6,7 +6,12 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // middlewares
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.restaurant_DB}:${process.env.restaurant_Pass}@cluster0.mrrlkes.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -27,6 +32,7 @@ async function run() {
 
     const menuCollection = client.db("restaurantDB").collection("menu");
     const reviewsCollection = client.db("restaurantDB").collection("reviews");
+    const cartCollection = client.db("restaurantDB").collection("carts");
 
     // get all menu
     app.get("/menu", async (req, res) => {
@@ -36,6 +42,19 @@ async function run() {
     // get all reviews
     app.get("/reviews", async (req, res) => {
       const result = await reviewsCollection.find().toArray();
+      res.send(result);
+    });
+    // get add cart
+    app.get("/carts", async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      const result = await cartCollection.find(query).toArray();
+      res.send(result);
+    });
+    // post add cart
+    app.post("/carts", async (req, res) => {
+      const item = req.body;
+      const result = await cartCollection.insertOne(item);
       res.send(result);
     });
 
