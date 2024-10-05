@@ -72,7 +72,6 @@ async function run() {
 
     // ------ users realted api start ------
     app.get("/users", verifyToken, async (req, res) => {
-      console.log(req.decoded);
       const result = await userCollection.find().toArray();
       res.send(result);
     });
@@ -81,11 +80,10 @@ async function run() {
     app.get("/users/admin/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
-      const user = await userCollection.findOne(query);
       if (email !== req.decoded.email) {
         return res.status(403).send({ message: "forbidden access" });
       }
-
+      const user = await userCollection.findOne(query);
       let admin = false;
       if (user?.role === "admin") {
         admin = true;
@@ -128,6 +126,15 @@ async function run() {
       const result = await menuCollection.find().toArray();
       res.send(result);
     });
+
+    // post a menu item on db 
+    app.post("/menu", verifyToken, verifyAdmin, async (req, res) => {
+      const item = req.body;
+      const result = await menuCollection.insertOne(item);
+      res.send(result);
+    });
+
+
     // ------ reviws realted api start ------
     app.get("/reviews", async (req, res) => {
       const result = await reviewsCollection.find().toArray();
