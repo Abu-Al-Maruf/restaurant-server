@@ -192,13 +192,14 @@ async function run() {
         clientSecret: paymentIntent.client_secret,
       });
     });
-    // get payments 
-    app.get("/payments/:email", async (req, res) => {
+    // get payments
+    app.get("/payments/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
+      console.log(email, req.decoded.email);
       const query = { email: email };
       const result = await paymentCollection.find(query).toArray();
       res.send(result);
-    })
+    });
 
     // save payments
     app.post("/payments", async (req, res) => {
@@ -214,6 +215,72 @@ async function run() {
       const deleteResult = await cartCollection.deleteMany(query);
 
       res.send({ paymentResult, deleteResult });
+    });
+
+    // stats or analytics
+    app.get("/admin-stats", async (req, res) => {
+      const users = await userCollection.countDocuments();
+      const menuItems = await menuCollection.countDocuments();
+      const orders = await paymentCollection.countDocuments();
+      // const payments = await paymentCollection.find().toArray();
+      // const revenue = payments.reduce((total, payment) => total + payment.price, 0);
+      const result = await paymentCollection
+        .aggregate([
+          {
+            $group: {
+              _id: null,
+              totalRevenue: { $sum: "$price" },
+            },
+          },
+        ])
+        .toArray();
+      const totalRevenue = result[0]?.totalRevenue || 0;
+
+      res.send({ users, menuItems, orders, totalRevenue });
+    });
+
+    // order stats
+    app.get("/order-stats", async (req, res) => {
+      const result = await paymentCollection
+        .aggregate([
+          {
+            $unwind: "$menuIds",
+          },
+          {
+            $addFields: {
+              menuIds: { $toObjectId: "$menuIds" }, // Convert menuIds from string to ObjectId
+            },
+          },
+          {
+            $lookup: {
+              from: "menu",
+              localField: "menuIds",
+              foreignField: "_id",
+              as: "menuItem",
+            },
+          },
+          {
+            $unwind: "$menuItem",
+          },
+          {
+            $group: {
+              _id: "$menuItem.name",
+              quantity: { $sum: 1 },
+              revenue: { $sum: "$menuItem.price" },
+            },
+          },
+          {
+            $project: {
+              _id: 0, // Exclude the _id field
+              category: "$_id", // Rename _id to category
+              quantity: "$quantity", // Include totalOrders
+              revenue: "$revenue", // Include totalRevenue
+            },
+          },
+        ])
+        .toArray();
+
+      res.send(result); // Send the result back to the client
     });
 
     // Send a ping to confirm a successful connection
